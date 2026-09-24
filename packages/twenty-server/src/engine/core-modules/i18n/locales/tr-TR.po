@@ -1237,6 +1237,25 @@ msgctxt "timelineActivityType.label"
 msgid "attached a file"
 msgstr "bir dosya ekledi"
 
+#. js-lingui-id: 6Rq6c5
+#: src/engine/metadata-modules/object-metadata/utils/compute-system-morph-target-field-label.util.ts
+#: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-attachment-standard-flat-field-metadata.util.ts
+#: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-attachment-standard-flat-field-metadata.util.ts
+#: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-attachment-standard-flat-field-metadata.util.ts
+#: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-attachment-standard-flat-field-metadata.util.ts
+#: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-attachment-standard-flat-field-metadata.util.ts
+#: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-attachment-standard-flat-field-metadata.util.ts
+#: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-attachment-standard-flat-field-metadata.util.ts
+msgctxt "fieldMetadata.label"
+msgid "Attached to"
+msgstr ""
+
+#. js-lingui-id: a/olsN
+#: src/engine/workspace-manager/twenty-standard-application/utils/page-layout-config/standard-attachment-page-layout.config.ts
+msgctxt "pageLayoutWidget.title"
+msgid "Attached to"
+msgstr ""
+
 #. js-lingui-id: b1LFyn
 #: src/engine/workspace-manager/twenty-standard-application/utils/object-metadata/create-standard-flat-object-metadata.util.ts
 msgctxt "objectMetadata.labelSingular"
@@ -2455,7 +2474,6 @@ msgstr "Şirketler"
 
 #. js-lingui-id: aNUhqB
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/build-standard-target-flat-field-metadatas.util.ts
-#: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-attachment-standard-flat-field-metadata.util.ts
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-note-target-standard-flat-field-metadata.util.ts
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-opportunity-standard-flat-field-metadata.util.ts
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-person-standard-flat-field-metadata.util.ts
@@ -3169,7 +3187,6 @@ msgid "Customer"
 msgstr "Müşteri"
 
 #. js-lingui-id: gmoxtb
-#: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-attachment-standard-flat-field-metadata.util.ts
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-timeline-activity-standard-flat-field-metadata.util.ts
 msgctxt "fieldMetadata.label"
 msgid "Dashboard"
@@ -3337,6 +3354,12 @@ msgstr "Aralık"
 msgctxt "fieldMetadata.label"
 msgid "Declined"
 msgstr "Reddedildi"
+
+#. js-lingui-id: dFxNmp
+#: src/engine/workspace-manager/twenty-standard-application/utils/page-layout-config/standard-attachment-page-layout.config.ts
+msgctxt "pageLayout.name"
+msgid "Default Attachment Layout"
+msgstr ""
 
 #. js-lingui-id: RbQaAF
 #: src/engine/metadata-modules/page-layout/constants/standard-page-layout-names.ts
@@ -7764,7 +7787,6 @@ msgid "Not started"
 msgstr "Başlatılmadı"
 
 #. js-lingui-id: O2bgDc
-#: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-attachment-standard-flat-field-metadata.util.ts
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-note-target-standard-flat-field-metadata.util.ts
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-timeline-activity-standard-flat-field-metadata.util.ts
 msgctxt "fieldMetadata.label"
@@ -8163,6 +8185,11 @@ msgstr "Yalnızca zamanlanmış veya gönderilmekte olan bir kampanya iptal edil
 msgid "Only administrators can impersonate users with admin privileges."
 msgstr "Yalnızca yöneticiler, yönetici ayrıcalıklarına sahip kullanıcıları başka biri gibi taklit edebilir."
 
+#. js-lingui-id: ApQ2Kw
+#: src/engine/core-modules/usage-limit/exceptions/usage-limit.exception.ts
+msgid "Only an operator can replace an instance default."
+msgstr ""
+
 #. js-lingui-id: JzXn58
 #: src/engine/core-modules/application/application-registration/application-registration.exception.ts
 msgid "Only applications published to npm can be claimed this way."
@@ -8264,7 +8291,6 @@ msgstr "Çalışma alanı üyesine ait fırsatlar"
 
 #. js-lingui-id: JpA/cO
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/build-standard-target-flat-field-metadatas.util.ts
-#: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-attachment-standard-flat-field-metadata.util.ts
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-note-target-standard-flat-field-metadata.util.ts
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-task-target-standard-flat-field-metadata.util.ts
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-timeline-activity-standard-flat-field-metadata.util.ts
@@ -8793,7 +8819,6 @@ msgstr "Kişi"
 
 #. js-lingui-id: F8wyAu
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/build-standard-target-flat-field-metadatas.util.ts
-#: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-attachment-standard-flat-field-metadata.util.ts
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-calendar-event-participant-standard-flat-field-metadata.util.ts
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-message-list-member-standard-flat-field-metadata.util.ts
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-message-participant-standard-flat-field-metadata.util.ts
@@ -9012,6 +9037,12 @@ msgstr "Tercih edilen dil"
 msgctxt "fieldMetadata.label"
 msgid "Presentation"
 msgstr "Sunum"
+
+#. js-lingui-id: pqO8TV
+#: src/engine/workspace-manager/twenty-standard-application/utils/page-layout-config/standard-attachment-page-layout.config.ts
+msgctxt "pageLayoutWidget.title"
+msgid "Preview"
+msgstr ""
 
 #. js-lingui-id: ysRzX6
 #: src/engine/workspace-manager/twenty-standard-application/constants/standard-command-menu-item.constant.ts
@@ -10990,7 +11021,6 @@ msgid "Target view not found"
 msgstr "Hedef görünüm bulunamadı"
 
 #. js-lingui-id: g6X4T4
-#: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-attachment-standard-flat-field-metadata.util.ts
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-task-target-standard-flat-field-metadata.util.ts
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-timeline-activity-standard-flat-field-metadata.util.ts
 msgctxt "fieldMetadata.label"
@@ -12104,6 +12134,11 @@ msgstr "Bu tür bir kredi hakkı elle oluşturulamaz."
 #: src/engine/core-modules/usage-limit/exceptions/usage-limit.exception.ts
 msgid "This limit cannot be saved."
 msgstr "Bu limit kaydedilemez."
+
+#. js-lingui-id: 1MfZ0Y
+#: src/engine/core-modules/usage-limit/exceptions/usage-limit.exception.ts
+msgid "This limit changed while you were editing it. Reload and try again."
+msgstr ""
 
 #. js-lingui-id: 6Z/zIt
 #: src/engine/metadata-modules/permissions/permissions.exception.ts
@@ -14006,7 +14041,6 @@ msgid "Work"
 msgstr "İş"
 
 #. js-lingui-id: y8IlfM
-#: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-attachment-standard-flat-field-metadata.util.ts
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-timeline-activity-standard-flat-field-metadata.util.ts
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-workflow-automated-trigger-standard-flat-field-metadata.util.ts
 #: src/engine/workspace-manager/twenty-standard-application/utils/field-metadata/compute-workflow-run-standard-flat-field-metadata.util.ts
