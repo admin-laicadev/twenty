@@ -1,0 +1,78 @@
+name: Laica Guard
+
+# Keeps upstream's CI switched off in this fork.
+#
+# Upstream ships ~50 workflows. They are useless here, they burn runner minutes
+# and they bury the one workflow that matters (Laica Image) in noise. They are
+# disabled through the Actions API rather than by deleting the files, so merging
+# upstream never hits a conflict.
+#
+# A merge from upstream re-enables them (a workflow file that arrives in a push
+# is active by default), and any newly added upstream workflow starts out active
+# too. Hence this runs on every push to main, on a weekly timer, and on demand.
+#
+# Anything named 'Laica *' is left alone - that is the naming contract for our
+# own workflows.
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    # Mondays 04:17 UTC. Catches workflows that appeared without a main push.
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+concurrency:
+  group: laica-guard
+  cancel-in-progress: false
+
+jobs:
+  disable:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+    steps:
+      - name: Disable every active upstream workflow
+        run: |
+          set -euo pipefail
+
+          gh api --paginate "repos/$REPO/actions/workflows" \
+            --jq '.workflows[] | select(.state == "active") | select(.name | startswith("Laica") | not) | "\(.id)\t\(.name)"' \
+            > /tmp/active.tsv
+
+          if [ ! -s /tmp/active.tsv ]; then
+            echo "Nothing to do - no active upstream workflow."
+            echo "Nothing to do - no active upstream workflow." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          {
+            echo "### Disabled"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          while IFS=$'\t' read -r id name; do
+            gh api -X PUT "repos/$REPO/actions/workflows/$id/disable"
+            echo "disabled: $name"
+            echo "- $name" >> "$GITHUB_STEP_SUMMARY"
+          done < /tmp/active.tsv
+
+      - name: Cancel upstream runs that already started
+        run: |
+          set -euo pipefail
+
+          for status in queued in_progress; do
+            gh api --paginate "repos/$REPO/actions/runs?status=$status" \
+              --jq '.workflow_runs[] | select(.name | startswith("Laica") | not) | .id'
+          done > /tmp/runs.txt
+
+          while read -r id; do
+            [ -n "$id" ] || continue
+            gh api -X POST "repos/$REPO/actions/runs/$id/cancel" || true
+            echo "cancelled run: $id"
+          done < /tmp/runs.txt
