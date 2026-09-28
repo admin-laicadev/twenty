@@ -28,7 +28,7 @@ import { FieldMetadataEntity } from 'src/engine/metadata-modules/field-metadata/
 import { FrontComponentEntity } from 'src/engine/metadata-modules/front-component/entities/front-component.entity';
 import { ObjectMetadataEntity } from 'src/engine/metadata-modules/object-metadata/object-metadata.entity';
 import { PageLayoutEntity } from 'src/engine/metadata-modules/page-layout/entities/page-layout.entity';
-import { OverridableEntity } from 'src/engine/workspace-manager/types/overridable-entity';
+import { OverridableEntity } from 'src/engine/workspace-manager/types/overridable-entity.type';
 
 export type CommandMenuItemOverrides = {
   isActive?: boolean;
@@ -45,6 +45,7 @@ export type CommandMenuItemOverrides = {
 };
 
 @Entity({ name: 'commandMenuItem', schema: 'core' })
+@Index('IDX_COMMAND_MENU_ITEM_APPLICATION_ID', ['applicationId'])
 @Index('IDX_COMMAND_MENU_ITEM_WORKFLOW_VERSION_ID_WORKSPACE_ID', [
   'workflowVersionId',
   'workspaceId',
