@@ -1,0 +1,89 @@
+name: Laica SDK
+
+# Packs the fork's twenty-sdk and twenty-client-sdk and attaches them to a
+# GitHub release. Upstream publishes both to npm; those carry no Laica code, so
+# the laica-stack apps install these tarballs instead.
+#
+# Same tag as Laica Image, so image and SDK always come from one commit:
+#   git tag v2.43.0-laica.1 && git push origin v2.43.0-laica.1
+# Result, on release v2.43.0-laica.1:
+#   twenty-sdk-2.43.0-laica.1.tgz
+#   twenty-client-sdk-2.43.0-laica.1.tgz
+#
+# Apps depend on the release URLs of both tarballs. twenty-sdk itself depends
+# on twenty-client-sdk; that dependency is rewritten to the release URL too,
+# because the Laica version does not exist on npm.
+
+on:
+  push:
+    tags:
+      - 'v*-laica.*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: laica-sdk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    env:
+      PACKAGES: twenty-client-sdk twenty-sdk
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        uses: ./.github/actions/yarn-install
+
+      - name: Derive version and release URL from the tag
+        run: |
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          echo "RELEASE_URL=https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+
+      - name: Set package versions
+        run: npx nx run-many -t set-local-version -p $PACKAGES --releaseVersion="$VERSION"
+
+      - name: Build
+        run: npx nx run-many -t build -p $PACKAGES
+
+      - name: Point twenty-sdk at the released twenty-client-sdk
+        working-directory: packages/twenty-sdk
+        run: |
+          node -e "
+            const fs = require('fs');
+            const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            p.dependencies['twenty-client-sdk'] = process.env.RELEASE_URL + '/twenty-client-sdk-' + process.env.VERSION + '.tgz';
+            fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          "
+
+      - name: Pack
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          for pkg in $PACKAGES; do
+            (cd "packages/$pkg" && yarn pack --out "$RUNNER_TEMP/out/$pkg-$VERSION.tgz")
+          done
+
+      - name: Attach tarballs to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP"/out/*.tgz --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP"/out/*.tgz \
+              --title "$GITHUB_REF_NAME" \
+              --notes "Laica fork build on top of upstream v${VERSION%%-laica.*}. Image: \`ghcr.io/${GITHUB_REPOSITORY}:${VERSION}\`."
+          fi
+
+      - name: Summary
+        run: |
+          {
+            echo "### SDK released"
+            echo
+            echo '```'
+            echo "\"twenty-sdk\": \"$RELEASE_URL/twenty-sdk-$VERSION.tgz\","
+            echo "\"twenty-client-sdk\": \"$RELEASE_URL/twenty-client-sdk-$VERSION.tgz\","
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
