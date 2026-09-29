@@ -463,6 +463,11 @@ msgstr "{failedCount} Datei(en) konnte(n) nicht hochgeladen werden"
 msgid "{fieldCount} fields on {recordLabel}"
 msgstr "{fieldCount} Felder in {recordLabel}"
 
+#. js-lingui-id: Uj2Kj4
+#: src/modules/views/components/ToggleMineFilterButton.tsx
+msgid "{fieldLabel} filter active"
+msgstr "{fieldLabel} Filter aktiv"
+
 #. js-lingui-id: fO/Qa9
 #: src/modules/settings/applications/hooks/useComputeObjectAndFieldsContentForApplication.ts
 msgid "{fieldsCount} fields"
@@ -2401,6 +2406,12 @@ msgstr "Alle Arbeitsbereiche, in denen dieser Benutzer Mitglied ist"
 #: src/modules/settings/roles/role-permissions/object-level-permissions/components/SettingsRolePermissionsObjectLevelObjectPicker.tsx
 msgid "All your custom objects"
 msgstr "Alle Ihre benutzerdefinierten Objekte"
+
+#. js-lingui-id: 0XbSkb
+#: src/modules/object-record/object-options-dropdown/components/ObjectOptionsDropdownCustomView.tsx
+#: src/modules/object-record/object-options-dropdown/components/ObjectOptionsDropdownToggleMineFilterFieldsContent.tsx
+msgid "All/Mine field"
+msgstr "Feld für Alle/Meine"
 
 #. js-lingui-id: 2M5OF+
 #: src/modules/settings/roles/role-permissions/permission-flags/hooks/useActionRolePermissionFlagConfig.ts
@@ -13676,6 +13687,11 @@ msgstr "Min"
 msgid "Min range"
 msgstr "Minimaler Bereich"
 
+#. js-lingui-id: oSrMRT
+#: src/modules/views/components/ToggleMineFilterButton.tsx
+msgid "Mine"
+msgstr "Meine"
+
 #. js-lingui-id: 8GG+Pa
 #: src/modules/ai/utils/getAiModelEffortLabel.ts
 msgid "Minimal"
@@ -19791,6 +19807,11 @@ msgstr "alle anzeigen"
 #: src/pages/settings/applications/components/SettingsApplicationRegistrationInstalledWorkspaces.tsx
 msgid "Show all"
 msgstr "Alle anzeigen"
+
+#. js-lingui-id: zR0ny4
+#: src/modules/views/components/ToggleMineFilterButton.tsx
+msgid "Show all or only my records"
+msgstr "Alle oder nur meine Datensätze anzeigen"
 
 #. js-lingui-id: tAUYYP
 #: src/modules/page-layout/widgets/fields/components/FieldsConfigurationFieldEditor.tsx
