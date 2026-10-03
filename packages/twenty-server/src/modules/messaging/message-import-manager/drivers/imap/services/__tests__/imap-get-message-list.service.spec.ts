@@ -1,4 +1,4 @@
-import { type ImapFlow } from 'imapflow';
+import { type ImapFlow, type ListResponse } from 'imapflow';
 import {
   ConnectedAccountProvider,
   MessageFolderImportPolicy,
@@ -7,6 +7,7 @@ import {
 
 import { type MessageFolder } from 'src/modules/messaging/message-folder-manager/interfaces/message-folder-driver.interface';
 import { type ImapClientProvider } from 'src/modules/messaging/message-import-manager/drivers/imap/providers/imap-client.provider';
+import { ImapFindDraftsFolderService } from 'src/modules/messaging/message-import-manager/drivers/imap/services/imap-find-drafts-folder.service';
 import { ImapGetMessageListService } from 'src/modules/messaging/message-import-manager/drivers/imap/services/imap-get-message-list.service';
 import { type ImapMessageListFetchErrorHandler } from 'src/modules/messaging/message-import-manager/drivers/imap/services/imap-message-list-fetch-error-handler.service';
 import { ImapSyncService } from 'src/modules/messaging/message-import-manager/drivers/imap/services/imap-sync.service';
@@ -16,6 +17,7 @@ type MailboxOnServer = {
   uidNext: number;
   messageUids: number[] | false;
   messageCount?: number;
+  mailboxes?: Pick<ListResponse, 'name' | 'path' | 'specialUse'>[];
 };
 
 const UID_VALIDITY = 1752657694;
@@ -38,6 +40,10 @@ const createClient = ({
   uidNext,
   messageUids,
   messageCount,
+  mailboxes = [
+    { name: 'INBOX', path: 'INBOX' },
+    { name: 'Drafts', path: 'Drafts', specialUse: '\\Drafts' },
+  ],
 }: MailboxOnServer) => {
   const exists =
     messageCount ?? (Array.isArray(messageUids) ? messageUids.length : 0);
@@ -45,6 +51,7 @@ const createClient = ({
   return {
     capabilities: new Set<string>(),
     enabled: new Set<string>(),
+    list: jest.fn().mockResolvedValue(mailboxes),
     status: jest.fn().mockResolvedValue({
       messages: exists,
       uidNext,
@@ -79,6 +86,7 @@ const getMessageList = async (
     } as unknown as ImapClientProvider,
     new ImapSyncService(),
     { handleError: jest.fn() } as unknown as ImapMessageListFetchErrorHandler,
+    new ImapFindDraftsFolderService(),
   );
 
   const [messageList] = await service.getMessageLists({
@@ -213,6 +221,42 @@ describe('ImapGetMessageListService', () => {
       expect(messageList.messageExternalIdsInFolder).toBeUndefined();
       expect(nextCursor.messageCount).toBe(2);
     });
+
+    it('lists the folder the server flags as drafts, whatever its name', async () => {
+      const folder = createFolder('Unfinished', {
+        highestUid: 2884,
+        uidValidity: UID_VALIDITY,
+        messageCount: 1,
+      });
+
+      const { messageList } = await getMessageList(folder, {
+        uidNext: 2887,
+        messageUids: [2886],
+        mailboxes: [
+          { name: 'Unfinished', path: 'Unfinished', specialUse: '\\Drafts' },
+        ],
+      });
+
+      expect(messageList.messageExternalIdsInFolder).toEqual([
+        'Unfinished:2886',
+      ]);
+    });
+
+    it('falls back to the folder name when the server flags no drafts folder', async () => {
+      const folder = createFolder('Drafts', {
+        highestUid: 2884,
+        uidValidity: UID_VALIDITY,
+        messageCount: 1,
+      });
+
+      const { messageList } = await getMessageList(folder, {
+        uidNext: 2887,
+        messageUids: [2886],
+        mailboxes: [{ name: 'Drafts', path: 'Drafts' }],
+      });
+
+      expect(messageList.messageExternalIdsInFolder).toEqual(['Drafts:2886']);
+    });
   });
 
   describe('other folders', () => {
@@ -230,6 +274,26 @@ describe('ImapGetMessageListService', () => {
 
       expect(messageList.messageExternalIds).toEqual(['INBOX:51']);
       expect(messageList.messageExternalIdsToDelete).toEqual([]);
+      expect(messageList.messageExternalIdsInFolder).toBeUndefined();
+    });
+
+    it('never lists a folder named like drafts when the server flags another one', async () => {
+      const folder = createFolder('Contract drafts', {
+        highestUid: 50,
+        uidValidity: UID_VALIDITY,
+        messageCount: 40,
+      });
+
+      const { messageList } = await getMessageList(folder, {
+        uidNext: 52,
+        messageUids: [51],
+        mailboxes: [
+          { name: 'Contract drafts', path: 'Contract drafts' },
+          { name: 'Drafts', path: 'Drafts', specialUse: '\\Drafts' },
+        ],
+      });
+
+      expect(messageList.messageExternalIds).toEqual(['Contract drafts:51']);
       expect(messageList.messageExternalIdsInFolder).toBeUndefined();
     });
 

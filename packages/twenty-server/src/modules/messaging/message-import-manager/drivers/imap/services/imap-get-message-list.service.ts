@@ -11,6 +11,7 @@ import {
   MessageImportDriverExceptionCode,
 } from 'src/modules/messaging/message-import-manager/drivers/exceptions/message-import-driver.exception';
 import { ImapClientProvider } from 'src/modules/messaging/message-import-manager/drivers/imap/providers/imap-client.provider';
+import { ImapFindDraftsFolderService } from 'src/modules/messaging/message-import-manager/drivers/imap/services/imap-find-drafts-folder.service';
 import { ImapMessageListFetchErrorHandler } from 'src/modules/messaging/message-import-manager/drivers/imap/services/imap-message-list-fetch-error-handler.service';
 import { ImapSyncService } from 'src/modules/messaging/message-import-manager/drivers/imap/services/imap-sync.service';
 import { createSyncCursor } from 'src/modules/messaging/message-import-manager/drivers/imap/utils/create-sync-cursor.util';
@@ -19,8 +20,6 @@ import { getImapFolderPath } from 'src/modules/messaging/message-import-manager/
 import { isImapMailboxNotFoundError } from 'src/modules/messaging/message-import-manager/drivers/imap/utils/is-imap-mailbox-not-found-error.util';
 import { normalizeImapUnicode } from 'src/modules/messaging/message-import-manager/drivers/imap/utils/normalize-imap-unicode.util';
 import { parseSyncCursor } from 'src/modules/messaging/message-import-manager/drivers/imap/utils/parse-sync-cursor.util';
-import { StandardFolder } from 'src/modules/messaging/message-import-manager/drivers/types/standard-folder.type';
-import { getStandardFolderByRegex } from 'src/modules/messaging/message-import-manager/drivers/utils/get-standard-folder-by-regex';
 import { type GetMessageListsArgs } from 'src/modules/messaging/message-import-manager/types/get-message-lists-args.type';
 import {
   type GetMessageListsResponse,
@@ -35,6 +34,7 @@ export class ImapGetMessageListService {
     private readonly imapClientProvider: ImapClientProvider,
     private readonly imapSyncService: ImapSyncService,
     private readonly errorHandler: ImapMessageListFetchErrorHandler,
+    private readonly imapFindDraftsFolderService: ImapFindDraftsFolderService,
   ) {}
 
   async getMessageLists({
@@ -61,9 +61,16 @@ export class ImapGetMessageListService {
     try {
       const results: GetMessageListsResponse = [];
 
+      const draftsFolder =
+        await this.imapFindDraftsFolderService.findOrCreateDraftsFolder(client);
+
       for (const folder of foldersToProcess) {
         try {
-          const response = await this.getMessageList(client, folder);
+          const response = await this.getMessageList(
+            client,
+            folder,
+            draftsFolder?.path,
+          );
 
           results.push({ ...response, folderId: folder.id });
         } catch (error) {
@@ -93,6 +100,7 @@ export class ImapGetMessageListService {
   private async getMessageList(
     client: ImapFlow,
     folder: MessageFolder,
+    draftsFolderPath: string | undefined,
   ): Promise<GetOneMessageListResponse> {
     const messageExternalIdPrefix = getImapFolderPath(folder.externalId);
 
@@ -105,7 +113,11 @@ export class ImapGetMessageListService {
 
     const folderPath = normalizeImapUnicode(messageExternalIdPrefix, client);
 
-    if (await this.canSkipFolderSync(client, folder)) {
+    const isDraftsFolder =
+      isDefined(draftsFolderPath) &&
+      folderPath === normalizeImapUnicode(draftsFolderPath, client);
+
+    if (await this.canSkipFolderSync(client, folder, isDraftsFolder)) {
       this.logger.log(`Skipping folder ${folder.name}: no new messages`);
 
       return {
@@ -150,7 +162,7 @@ export class ImapGetMessageListService {
       // only the drafts folder is compared: mail removed from any other folder
       // stays in the CRM.
       const hasRemovedMessages =
-        this.isDraftsFolder(folder) &&
+        isDraftsFolder &&
         isDefined(mailboxState.messageCount) &&
         (!isDefined(previousCursor?.messageCount) ||
           previousCursor.messageCount + messageUids.length >
@@ -203,16 +215,10 @@ export class ImapGetMessageListService {
     }
   }
 
-  private isDraftsFolder(folder: MessageFolder): boolean {
-    return (
-      isDefined(folder.name) &&
-      getStandardFolderByRegex(folder.name) === StandardFolder.DRAFTS
-    );
-  }
-
   private async canSkipFolderSync(
     client: ImapFlow,
     folder: MessageFolder,
+    isDraftsFolder: boolean,
   ): Promise<boolean> {
     const folderPath = getImapFolderPath(folder.externalId, client);
     const previousCursor = parseSyncCursor(folder.syncCursor);
@@ -273,7 +279,7 @@ export class ImapGetMessageListService {
 
       // An expunged draft moves neither UIDNEXT nor, without CONDSTORE, MODSEQ.
       const hasMessageCountChanged =
-        this.isDraftsFolder(folder) &&
+        isDraftsFolder &&
         (!isDefined(status.messages) ||
           previousCursor.messageCount !== Number(status.messages));
 
