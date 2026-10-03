@@ -11,6 +11,7 @@ import {
   MessageImportDriverExceptionCode,
 } from 'src/modules/messaging/message-import-manager/drivers/exceptions/message-import-driver.exception';
 import { ImapClientProvider } from 'src/modules/messaging/message-import-manager/drivers/imap/providers/imap-client.provider';
+import { ImapFindDraftsFolderService } from 'src/modules/messaging/message-import-manager/drivers/imap/services/imap-find-drafts-folder.service';
 import { ImapMessageListFetchErrorHandler } from 'src/modules/messaging/message-import-manager/drivers/imap/services/imap-message-list-fetch-error-handler.service';
 import { ImapSyncService } from 'src/modules/messaging/message-import-manager/drivers/imap/services/imap-sync.service';
 import { createSyncCursor } from 'src/modules/messaging/message-import-manager/drivers/imap/utils/create-sync-cursor.util';
@@ -33,6 +34,7 @@ export class ImapGetMessageListService {
     private readonly imapClientProvider: ImapClientProvider,
     private readonly imapSyncService: ImapSyncService,
     private readonly errorHandler: ImapMessageListFetchErrorHandler,
+    private readonly imapFindDraftsFolderService: ImapFindDraftsFolderService,
   ) {}
 
   async getMessageLists({
@@ -59,9 +61,16 @@ export class ImapGetMessageListService {
     try {
       const results: GetMessageListsResponse = [];
 
+      const draftsFolder =
+        await this.imapFindDraftsFolderService.findOrCreateDraftsFolder(client);
+
       for (const folder of foldersToProcess) {
         try {
-          const response = await this.getMessageList(client, folder);
+          const response = await this.getMessageList(
+            client,
+            folder,
+            draftsFolder?.path,
+          );
 
           results.push({ ...response, folderId: folder.id });
         } catch (error) {
@@ -91,6 +100,7 @@ export class ImapGetMessageListService {
   private async getMessageList(
     client: ImapFlow,
     folder: MessageFolder,
+    draftsFolderPath: string | undefined,
   ): Promise<GetOneMessageListResponse> {
     const messageExternalIdPrefix = getImapFolderPath(folder.externalId);
 
@@ -103,7 +113,11 @@ export class ImapGetMessageListService {
 
     const folderPath = normalizeImapUnicode(messageExternalIdPrefix, client);
 
-    if (await this.canSkipFolderSync(client, folder)) {
+    const isDraftsFolder =
+      isDefined(draftsFolderPath) &&
+      folderPath === normalizeImapUnicode(draftsFolderPath, client);
+
+    if (await this.canSkipFolderSync(client, folder, isDraftsFolder)) {
       this.logger.log(`Skipping folder ${folder.name}: no new messages`);
 
       return {
@@ -144,11 +158,29 @@ export class ImapGetMessageListService {
         mailboxState,
       );
 
-      const nextCursor = createSyncCursor(
-        messageUids,
-        previousCursor,
-        mailboxState,
-      );
+      // Mail clients save a draft as a new message and expunge the old one, so
+      // only the drafts folder is compared: mail removed from any other folder
+      // stays in the CRM.
+      const hasRemovedMessages =
+        isDraftsFolder &&
+        isDefined(mailboxState.messageCount) &&
+        (!isDefined(previousCursor?.messageCount) ||
+          previousCursor.messageCount + messageUids.length >
+            mailboxState.messageCount);
+
+      const messageUidsInFolder = hasRemovedMessages
+        ? await this.imapSyncService.fetchAllMessageUids(client, mailboxState)
+        : null;
+
+      const shouldRetryComparison =
+        hasRemovedMessages && !isDefined(messageUidsInFolder);
+
+      const nextCursor = {
+        ...createSyncCursor(messageUids, previousCursor, mailboxState),
+        ...(shouldRetryComparison
+          ? { messageCount: previousCursor?.messageCount }
+          : {}),
+      };
 
       const messageExternalIds = messageUids
         .sort((a, b) => b - a)
@@ -160,6 +192,13 @@ export class ImapGetMessageListService {
         nextSyncCursor: JSON.stringify(nextCursor),
         previousSyncCursor: folder.syncCursor,
         folderId: folder.id,
+        ...(isDefined(messageUidsInFolder)
+          ? {
+              messageExternalIdsInFolder: messageUidsInFolder.map(
+                (uid) => `${messageExternalIdPrefix}:${uid}`,
+              ),
+            }
+          : {}),
       };
     } catch (error) {
       if (isImapMailboxNotFoundError(error)) {
@@ -179,6 +218,7 @@ export class ImapGetMessageListService {
   private async canSkipFolderSync(
     client: ImapFlow,
     folder: MessageFolder,
+    isDraftsFolder: boolean,
   ): Promise<boolean> {
     const folderPath = getImapFolderPath(folder.externalId, client);
     const previousCursor = parseSyncCursor(folder.syncCursor);
@@ -191,6 +231,7 @@ export class ImapGetMessageListService {
       const supportsCondstore = client.capabilities.has('CONDSTORE');
 
       const status = await client.status(folderPath, {
+        messages: true,
         uidNext: true,
         uidValidity: true,
         ...(supportsCondstore && { highestModseq: true }),
@@ -231,6 +272,20 @@ export class ImapGetMessageListService {
       if (hasModSeqChanged) {
         this.logger.debug(
           `Folder ${folderPath}: MODSEQ changed (${previousCursor.modSeq} → ${status.highestModseq}). Sync required.`,
+        );
+
+        return false;
+      }
+
+      // An expunged draft moves neither UIDNEXT nor, without CONDSTORE, MODSEQ.
+      const hasMessageCountChanged =
+        isDraftsFolder &&
+        (!isDefined(status.messages) ||
+          previousCursor.messageCount !== Number(status.messages));
+
+      if (hasMessageCountChanged) {
+        this.logger.debug(
+          `Folder ${folderPath}: message count changed (${previousCursor.messageCount} → ${status.messages}). Sync required.`,
         );
 
         return false;

@@ -75,4 +75,23 @@ export class ImapSyncService {
 
     return uids;
   }
+
+  // Returns null when the server gives no usable answer: an unusable search
+  // result must never be read as an empty folder.
+  async fetchAllMessageUids(
+    client: ImapFlow,
+    mailboxState: MailboxState,
+  ): Promise<number[] | null> {
+    if (mailboxState.messageCount === 0) {
+      return [];
+    }
+
+    const uids = await client.search({ all: true }, { uid: true });
+
+    if (!Array.isArray(uids)) {
+      return null;
+    }
+
+    return uids;
+  }
 }
