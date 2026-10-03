@@ -19,6 +19,8 @@ import { getImapFolderPath } from 'src/modules/messaging/message-import-manager/
 import { isImapMailboxNotFoundError } from 'src/modules/messaging/message-import-manager/drivers/imap/utils/is-imap-mailbox-not-found-error.util';
 import { normalizeImapUnicode } from 'src/modules/messaging/message-import-manager/drivers/imap/utils/normalize-imap-unicode.util';
 import { parseSyncCursor } from 'src/modules/messaging/message-import-manager/drivers/imap/utils/parse-sync-cursor.util';
+import { StandardFolder } from 'src/modules/messaging/message-import-manager/drivers/types/standard-folder.type';
+import { getStandardFolderByRegex } from 'src/modules/messaging/message-import-manager/drivers/utils/get-standard-folder-by-regex';
 import { type GetMessageListsArgs } from 'src/modules/messaging/message-import-manager/types/get-message-lists-args.type';
 import {
   type GetMessageListsResponse,
@@ -144,11 +146,29 @@ export class ImapGetMessageListService {
         mailboxState,
       );
 
-      const nextCursor = createSyncCursor(
-        messageUids,
-        previousCursor,
-        mailboxState,
-      );
+      // Mail clients save a draft as a new message and expunge the old one, so
+      // only the drafts folder is compared: mail removed from any other folder
+      // stays in the CRM.
+      const hasRemovedMessages =
+        this.isDraftsFolder(folder) &&
+        isDefined(mailboxState.messageCount) &&
+        (!isDefined(previousCursor?.messageCount) ||
+          previousCursor.messageCount + messageUids.length >
+            mailboxState.messageCount);
+
+      const messageUidsInFolder = hasRemovedMessages
+        ? await this.imapSyncService.fetchAllMessageUids(client, mailboxState)
+        : null;
+
+      const shouldRetryComparison =
+        hasRemovedMessages && !isDefined(messageUidsInFolder);
+
+      const nextCursor = {
+        ...createSyncCursor(messageUids, previousCursor, mailboxState),
+        ...(shouldRetryComparison
+          ? { messageCount: previousCursor?.messageCount }
+          : {}),
+      };
 
       const messageExternalIds = messageUids
         .sort((a, b) => b - a)
@@ -160,6 +180,13 @@ export class ImapGetMessageListService {
         nextSyncCursor: JSON.stringify(nextCursor),
         previousSyncCursor: folder.syncCursor,
         folderId: folder.id,
+        ...(isDefined(messageUidsInFolder)
+          ? {
+              messageExternalIdsInFolder: messageUidsInFolder.map(
+                (uid) => `${messageExternalIdPrefix}:${uid}`,
+              ),
+            }
+          : {}),
       };
     } catch (error) {
       if (isImapMailboxNotFoundError(error)) {
@@ -174,6 +201,13 @@ export class ImapGetMessageListService {
     } finally {
       lock.release();
     }
+  }
+
+  private isDraftsFolder(folder: MessageFolder): boolean {
+    return (
+      isDefined(folder.name) &&
+      getStandardFolderByRegex(folder.name) === StandardFolder.DRAFTS
+    );
   }
 
   private async canSkipFolderSync(
@@ -191,6 +225,7 @@ export class ImapGetMessageListService {
       const supportsCondstore = client.capabilities.has('CONDSTORE');
 
       const status = await client.status(folderPath, {
+        messages: true,
         uidNext: true,
         uidValidity: true,
         ...(supportsCondstore && { highestModseq: true }),
@@ -231,6 +266,20 @@ export class ImapGetMessageListService {
       if (hasModSeqChanged) {
         this.logger.debug(
           `Folder ${folderPath}: MODSEQ changed (${previousCursor.modSeq} → ${status.highestModseq}). Sync required.`,
+        );
+
+        return false;
+      }
+
+      // An expunged draft moves neither UIDNEXT nor, without CONDSTORE, MODSEQ.
+      const hasMessageCountChanged =
+        this.isDraftsFolder(folder) &&
+        (!isDefined(status.messages) ||
+          previousCursor.messageCount !== Number(status.messages));
+
+      if (hasMessageCountChanged) {
+        this.logger.debug(
+          `Folder ${folderPath}: message count changed (${previousCursor.messageCount} → ${status.messages}). Sync required.`,
         );
 
         return false;
