@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { isNonEmptyString } from '@sniptt/guards';
 import chunk from 'lodash.chunk';
 import { isDefined } from 'twenty-shared/utils';
-import { In, MoreThanOrEqual, Repository } from 'typeorm';
+import { In, MoreThan, MoreThanOrEqual, Repository } from 'typeorm';
 
 import {
   MessageChannelPendingGroupEmailsAction,
@@ -17,6 +17,7 @@ import { CacheStorageNamespace } from 'src/engine/core-modules/cache-storage/typ
 import { WorkspaceOrmManager } from 'src/engine/twenty-orm/workspace-orm.manager';
 import { buildSystemAuthContext } from 'src/engine/twenty-orm/utils/build-system-auth-context.util';
 import { MessageChannelSyncStatusService } from 'src/modules/messaging/common/services/message-channel-sync-status.service';
+import { type MessageChannelMessageAssociationMessageFolderWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message-channel-message-association-message-folder.workspace-entity';
 import { type MessageChannelMessageAssociationWorkspaceEntity } from 'src/modules/messaging/common/standard-objects/message-channel-message-association.workspace-entity';
 import { MessagingMessageCleanerService } from 'src/modules/messaging/message-cleaner/services/messaging-message-cleaner.service';
 import { SyncMessageFoldersService } from 'src/modules/messaging/message-folder-manager/services/sync-message-folders.service';
@@ -33,6 +34,7 @@ import {
 } from 'src/modules/messaging/message-import-manager/services/messaging-process-folder-actions.service';
 import { MessagingProcessGroupEmailActionsService } from 'src/modules/messaging/message-import-manager/services/messaging-process-group-email-actions.service';
 import { MessageChannelEntity } from 'src/engine/metadata-modules/message-channel/entities/message-channel.entity';
+import { type GetMessageListsResponse } from 'src/modules/messaging/message-import-manager/types/get-message-lists-response.type';
 import { filterMessageExternalIdsToDelete } from 'src/modules/messaging/message-import-manager/utils/filter-message-external-ids-to-delete.util';
 
 const ONE_WEEK_IN_MILLISECONDS = 7 * 24 * 60 * 60 * 1000;
@@ -214,11 +216,18 @@ export class MessagingMessageListFetchService {
               )
             : [];
 
+          const messageExternalIdsMissingFromFolders =
+            await this.computeMessageExternalIdsMissingFromFolders(
+              freshMessageChannel,
+              messageLists,
+            );
+
           const allMessageExternalIdsToDelete =
             filterMessageExternalIdsToDelete({
               messageExternalIds,
               messageExternalIdsToDelete: [
                 ...messageExternalIdsToDelete,
+                ...messageExternalIdsMissingFromFolders,
                 ...fullSyncMessageChannelMessageAssociationsToDelete.map(
                   (messageChannelMessageAssociation) =>
                     messageChannelMessageAssociation.messageExternalId,
@@ -341,6 +350,84 @@ export class MessagingMessageListFetchService {
       foldersWithPendingActions,
       workspaceId,
     );
+  }
+
+  private async computeMessageExternalIdsMissingFromFolders(
+    messageChannel: Pick<MessageChannelEntity, 'id'>,
+    messageLists: GetMessageListsResponse,
+  ): Promise<string[]> {
+    const messageFolderAssociationRepository =
+      this.workspaceOrmManager.getRepository<MessageChannelMessageAssociationMessageFolderWorkspaceEntity>(
+        'messageChannelMessageAssociationMessageFolder',
+        { shouldBypassPermissionChecks: true },
+      );
+
+    const messageChannelMessageAssociationRepository =
+      this.workspaceOrmManager.getRepository<MessageChannelMessageAssociationWorkspaceEntity>(
+        'messageChannelMessageAssociation',
+        { shouldBypassPermissionChecks: true },
+      );
+
+    const messageExternalIdsMissingFromFolders: string[] = [];
+
+    for (const { folderId, messageExternalIdsInFolder } of messageLists) {
+      if (!isDefined(folderId) || !isDefined(messageExternalIdsInFolder)) {
+        continue;
+      }
+
+      const messageExternalIdInFolderSet = new Set(messageExternalIdsInFolder);
+
+      let lastFolderAssociationId: string | undefined;
+
+      for (;;) {
+        const folderAssociations =
+          await messageFolderAssociationRepository.find({
+            where: {
+              messageFolderId: folderId,
+              ...(isDefined(lastFolderAssociationId)
+                ? { id: MoreThan(lastFolderAssociationId) }
+                : {}),
+            },
+            order: { id: 'ASC' },
+            take: 200,
+          });
+
+        if (folderAssociations.length === 0) {
+          break;
+        }
+
+        const messageChannelMessageAssociations =
+          await messageChannelMessageAssociationRepository.find({
+            where: {
+              id: In(
+                folderAssociations.map(
+                  (folderAssociation) =>
+                    folderAssociation.messageChannelMessageAssociationId,
+                ),
+              ),
+              messageChannelId: messageChannel.id,
+            },
+          });
+
+        for (const { messageExternalId } of messageChannelMessageAssociations) {
+          if (
+            isDefined(messageExternalId) &&
+            !messageExternalIdInFolderSet.has(messageExternalId)
+          ) {
+            messageExternalIdsMissingFromFolders.push(messageExternalId);
+          }
+        }
+
+        if (folderAssociations.length < 200) {
+          break;
+        }
+
+        lastFolderAssociationId =
+          folderAssociations[folderAssociations.length - 1].id;
+      }
+    }
+
+    return messageExternalIdsMissingFromFolders;
   }
 
   private async computeFullSyncMessageChannelMessageAssociationsToDelete(
