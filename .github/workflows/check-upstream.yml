@@ -1,6 +1,6 @@
 # Weekly Upstream check: keeps one Upstream PR on the newest twentyhq/twenty release.
 # Shared workflow and docs: https://github.com/timschoch/skilly/blob/main/.github/workflows/check-upstream.yml
-name: check upstream
+name: Laica Check Upstream
 on:
   schedule: [{ cron: '0 6 * * 6' }]
   workflow_dispatch:
