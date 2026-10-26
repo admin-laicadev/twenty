@@ -1,0 +1,25 @@
+# Weekly Upstream check: keeps one Upstream PR on the newest twentyhq/twenty release.
+# Shared workflow and docs: https://github.com/timschoch/skilly/blob/main/.github/workflows/check-upstream.yml
+name: check upstream
+on:
+  schedule: [{ cron: '0 6 * * 6' }]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Print the plan, write nothing
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  check:
+    uses: timschoch/skilly/.github/workflows/check-upstream.yml@main
+    with:
+      upstream: twentyhq/twenty
+      tag-prefix: twenty/v
+      dependents: admin-laicadev/laica-stack
+      dry-run: ${{ inputs.dry-run == true }}
+    secrets:
+      SKILLY_APP_ID: ${{ secrets.SKILLY_APP_ID }}
+      SKILLY_APP_PRIVATE_KEY: ${{ secrets.SKILLY_APP_PRIVATE_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
